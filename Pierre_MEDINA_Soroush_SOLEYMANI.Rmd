@@ -1,0 +1,480 @@
+---
+title: "TP  Pierre Médina et Soroush Soleymani"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+date: "2026-11-06"
+---
+## TP Analyse et fouille de données 
+
+TP Analyse et fouille de données  Pierre Médina et Soroush Soleymani
+
+## Question 1: Import et vérification des types
+```{r q1, fig.width=7, fig.height=6, message=FALSE, warning=FALSE}
+library(FactoMineR)
+library(factoextra)
+
+communes <- read.csv("communes.csv", stringsAsFactors = TRUE, encoding = "UTF-8")
+
+str(communes)
+summary(communes)
+
+```
+Dans notre jeu de données les variables reéion, type_commune et transport_principal sont des variables qualitatives. Pour les analyser dans R, nous devons donc les déclarer comme des facteurs.
+
+## Question 2: Valeurs manquantes & Nettoyage des données
+
+
+```{r q2, fig.width=7, fig.height=6, message=FALSE, warning=FALSE}
+library(dplyr)
+
+lignesAvecNA = communes %>% filter(if_any(everything(), is.na))
+```
+
+
+
+Comme il n'y a que 8 lignes sur 200 communes, il est possible de supprimer ses lignes sans que cela n'ai de trop grande incidence (car en dessous de 5%). On créer donc un nouveau jeu de data sans ces lignes, c'est de lui dont nous nous serviront par la suite. On conserve donc 192 communes.
+
+```{r q3, fig.width=7, fig.height=6}
+donneesSansNA = communes %>% filter(!if_any(everything(), is.na))
+```
+
+## Question 3: Statistiques descriptives et transformation de la densité
+
+```{r}
+mesMoyennes = c()
+mesMaxs = c()
+mesMins = c()
+mesEcartTyp = c()
+
+
+
+for (colonne in names(donneesSansNA)) {
+  if (is.numeric(donneesSansNA[[colonne]])) {
+        mesMoyennes[colonne] = mean(donneesSansNA[[colonne]], na.rm = TRUE)
+        mesEcartTyp[colonne] = sd(donneesSansNA[[colonne]], na.rm = TRUE)    
+        mesMins[colonne]= min(donneesSansNA[[colonne]], na.rm = TRUE)
+        mesMaxs[colonne] = max(donneesSansNA[[colonne]], na.rm = TRUE)}
+}
+
+print(mesMoyennes)
+
+print(mesMaxs)
+
+print(mesMins)
+
+print(mesEcartTyp)
+
+donneesSansNA$LogDensite <- log(donneesSansNA$densite)
+
+hist(donneesSansNA$densite, 
+     main = "Distribution de la variable Densité", 
+     xlab = "Densité", 
+     ylab = "Fréquence", 
+     breaks = 50) 
+```
+
+On observe qu'il y a beaucoup plus de communes à faible densité que de communes à grandes densités. 
+La densité est très asymétrique : la moyenne est loin de la médiane et l'écart-type dépasse la moyenne. Une poignée de communes très denses étire la queue de la distribution vers la droite.
+
+
+Comme l'ACP repose sur les corrélations linéaires et sur la variance : quelques valeurs extrêmes suffiraient à tirer le premier axe à elles seules. Le logarithme resserre les grandes valeurs et rend la distribution à peu près symétrique. Dans la suite, on travaille avec LogDensite.
+
+## Question 4: Matrice des corrélations
+
+```{r q4, fig.width=7, fig.height=6, message=FALSE, warning=FALSE}
+library(corrplot)
+
+vars <- c("LogDensite", "revenu_median", "taux_chomage", "part_diplomes_sup",
+          "prix_m2", "part_plus65", "temps_trajet", "equipements")
+
+cor_mat <- cor(donneesSansNA[, vars])
+round(cor_mat, 2)
+
+corrplot(cor_mat, method = "color", type = "upper",
+         addCoef.col = "black", number.cex = 0.7, tl.cex = 0.8, tl.col = "black")
+```
+
+```{r q4-top3}
+paires <- which(upper.tri(cor_mat), arr.ind = TRUE)
+df_cor <- data.frame(var1 = rownames(cor_mat)[paires[, 1]],
+                     var2 = colnames(cor_mat)[paires[, 2]],
+                     r = round(cor_mat[paires], 2))
+head(df_cor[order(-abs(df_cor$r)), ], 3)
+```
+
+Les trois couples de variables présentant les liaisons les plus fortes sont :
+equipements et prix_m2 avec une corrélation de 0.86.  
+prix_m2 et part_diplomes_sup avec une corrélation de 0.86.   
+equipements et LogDensite avec une corrélation de 0.85.
+
+
+## Question 5: Tableau de contingence et profils-lignes
+
+Nous allons croiser les variables qualitatives `type_commune` et `transport_principal` pour observer leur répartition conjointe, puis calculer les profils-lignes en pourcentage pour analyser la part de chaque mode de transport au sein de chaque type de commune.
+
+```{r q5, fig.width=7, fig.height=6}
+
+
+
+tab_contingence <- table(donneesSansNA$type_commune, donneesSansNA$transport_principal)
+
+
+print(tab_contingence)
+profils_lignes <- prop.table(tab_contingence, margin = 1) * 100
+
+print(round(profils_lignes, 2))
+```
+On observe que la Voiture est beaucoup plus présente en zone périurbaine et rurales à la différence des zones urbaines, à l'inverse les transports en communs sont bien plus utilisés en zones urbaines.
+Ce sont des conclusions qui paraissent cohérentes avec la réalité, ce qui assure le bon déroulement de nos étapes de calculs du tableau de contingences.
+
+## Question 6: Faut-il centrer-réduire ?
+
+
+Il est indispensable de centrer et réduire les variables avant l'ACP car elles possèdent des unités hétérogènes et des écarts-types extrêmement disparates. Sans cette standardisation, les variables présentant de grands ordres de grandeur, telles que le revenu médian, écraseraient artificiellement la variance des indicateurs plus petits comme les équipements. 
+
+La fonction PCA() du package FactoMineR effectue heureusement cette transformation de manière automatique.
+
+## Question 7: ACP normée avec FactoMineR
+
+```{r q7, fig.width=7, fig.height=6}
+
+donnees_pca <- donneesSansNA[, c(
+  "revenu_median", "taux_chomage", "part_diplomes_sup", "prix_m2", 
+  "part_plus65", "temps_trajet", "equipements", "LogDensite",
+  
+  "region", "type_commune", "transport_principal",
+    "densite" 
+)]
+
+res.pca <- PCA(donnees_pca, 
+               scale.unit = TRUE, 
+               ncp = 8,
+               quali.sup = 9:11, 
+               quanti.sup = 12, 
+               graph = FALSE)
+
+print(res.pca$eig)
+
+fviz_eig(res.pca, 
+         addlabels = TRUE, 
+         ylim = c(0, 60),
+         main = "Éboulis des valeurs propres",
+         ylab = "Pourcentage de variance expliquée",
+         xlab = "Dimensions")
+```
+
+## Question 8: Nombre d'axes retenus
+
+
+1. Critère de Kaiser :
+La règle de Kaiser consiste à conserver les axes dont la valeur propre est supérieure à 1. En lisant le tableau fourni, seuls les deux premiers axes remplissent cette condition.  
+
+2. Critère du coude :
+L'observation du graphique de l'éboulis montre une chute importante du pourcentage de variance expliquée entre la première et la deuxième dimension, suivie d'un net point d'inflexion (le "coude") au niveau de la dimension 3 (qui ne représente plus que 9.5 % de la variance). Cela indique qu'il faut conserver les deux premières dimensions.   
+
+3. Part d'inertie cumulée :
+Le tableau des valeurs propres indique qu'en retenant uniquement les composantes 1 et 2, on parvient à expliquer 76.72 % de la variance totale du jeu de données.  
+
+Conclusion :
+La convergence de ces trois critères nous amène à retenir 2 axes principaux. Cette sélection est optimale : elle nous permet de réduire la complexité du jeu de données de 8 variables initiales à seulement 2 dimensions, tout en conservant plus des trois quarts (environ 76.7 %) de l'information de départ.
+
+## Question 9: Cercle des corrélations et nommage des axes
+
+```{r q9, fig.width=7, fig.height=6}
+library(factoextra)
+
+
+coord_var <- res.pca$var$coord[, 1:2]
+
+
+cos2_var <- res.pca$var$cos2[, 1:2]
+contrib_var <- res.pca$var$contrib[, 1:2]
+
+indicateurs_var <- data.frame(
+  Coord_Dim1 = coord_var[, 1], Contrib_Dim1 = contrib_var[, 1], Cos2_Dim1 = cos2_var[, 1],
+  Coord_Dim2 = coord_var[, 2], Contrib_Dim2 = contrib_var[, 2], Cos2_Dim2 = cos2_var[, 2]
+)
+print(round(indicateurs_var, 3))
+
+
+fviz_pca_var(res.pca, axes = c(1, 2),
+             col.var = "cos2", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE) +
+  labs(title = "Cercle des corrélations (Axes 1 et 2)",
+       subtitle = "Couleur selon la qualité de représentation (Cos²)")
+```
+Analyse du cercle des corrélations 
+Les variables situées à la périphérie du cercle sont très bien représentées sur ces deux premiers axes. L'Axe 1 est fortement structuré par les variables d'équipements, du prix au m², de la part des diplômés et du LogDensite, qui contribuent toutes massivement et dans le même sens. 
+ 
+L'Axe 2, indépendant du premier, est défini par les variables restantes (comme le taux de chômage, l'âge ou le temps de trajet), mettant en lumière une seconde dimension liée aux fragilités ou à l'enclavement. 
+
+On peut donc définir Axe 1 = attractivité urbaine , Axe 2 = fragilité socio-démographique 
+
+De plus, la projection cohérente de la variable illustrative (densité brute) dans la même direction que le LogDensite valide méthodologiquement la transformation logarithmique effectuée lors de la préparation des données.
+
+## Question 10: Variable mal représentée sur le plan (1, 2)
+```{r q10, fig.width=7, fig.height=6}
+cos2_plan <- rowSums(res.pca$var$cos2[, 1:2])
+sort(round(cos2_plan, 2))
+
+round(res.pca$var$cos2["temps_trajet", 1:3], 2)
+```
+
+la variable temps_trajet est effectivement la plus mal représentée sur le plan (1, 2) car sa flèche est la plus proche du centre et sa couleur indique le cos^2 le plus faible. N'étant pas correctement expliquée par ces deux premières dimensions, elle se projette nécessairement mieux sur un axe de rang supérieur (très probablement l'Axe 3)
+
+
+## Question 11: Nuage des individus et ellipses
+```{r q11, fig.width=7, fig.height=6}
+
+fviz_pca_ind(res.pca,
+             habillage = "type_commune", 
+             addEllipses = TRUE, 
+             ellipse.level = 0.95,
+             geom = "point", 
+             alpha.ind = 0.7) +
+  labs(title = "Nuage des individus selon le type de commune")
+
+print(round(res.pca$quali.sup$v.test, 2))
+```
+D'après le graphique, l'Axe 1 (Dimension 1) discrimine parfaitement les territoires. Les communes rurales se situent nettement du côté négatif de l'axe, s'opposant aux communes urbaines qui se trouvent du côté positif (celui de l'attractivité et de la densité).
+ 
+ Les communes périurbaines occupent une position intermédiaire logique au centre du plan, faisant la transition entre les deux autres groupes. 
+ 
+ Sur l'Axe 2 (Dimension 2), la séparation est moins marquée, même si les zones rurales tendent vers le haut (positif) et les zones urbaines vers le bas (négatif). 
+
+
+## Question 12: Communes qui contribuent le plus à l'axe 1
+
+```{r q12, fig.width=7, fig.height=6}
+contrib_ind1 <- sort(res.pca$ind$contrib[, 1], decreasing = TRUE)
+top3 <- names(contrib_ind1)[1:3]
+round(contrib_ind1[1:3], 2)
+
+donneesSansNA[top3, c("region", "type_commune", "transport_principal", "densite", "revenu_median",
+                 "taux_chomage", "part_diplomes_sup", "prix_m2", "part_plus65",
+                 "temps_trajet", "equipements")]
+
+```
+On repère les trois communes les plus contributives à l'axe 1, puis on revient aux **données brutes** (et non transformées) pour comprendre leur profil. Ce sont des communes urbaines très denses, avec un prix au m² et une part de diplômés très élevés, beaucoup d'équipements et un trajet domicile-travail court.
+
+Leur présence **ne déforme pas l'analyse**, aucune ne pèse plus de quelques pourcents de l'axe (`r round(contrib_ind1[1], 1)` % pour la plus forte, sur 192 communes). Elles sont extrêmes dans le sens même de l'axe. Ce sont les cas les plus urbains, pas des valeurs aberrantes qui tireraient l'axe vers elles. C'est aussi pour cela que le passage au logarithme de la densité était utile. Il n'y a donc pas de raison de les retirer.
+
+## Question 13: La région structure-t-elle le plan ?
+
+```{r q13, fig.width=7, fig.height=6}
+round(res.pca$quali.sup$v.test[c("Centre", "Est", "Nord", "Ouest", "Sud"), 1:2], 2)
+
+dd <- dimdesc(res.pca, axes = 1:2, proba = 0.05)
+dd$Dim.1$quali
+dd$Dim.2$quali
+```
+
+Si la région structurait le plan, ses modalités auraient des valeurs-tests supérieures à 1,96 en valeur absolue. Sur l'axe 1, aucune région n'est significative. l'opposition urbain/rural traverse toutes les régions. Sur l'axe 2, seul le **Nord** se distingue nettement (valeur-test d'environ −3,2), dans cet échantillon, ses communes sont en moyenne un peu moins favorisées économiquement. `dimdesc()` va dans le même sens, le lien entre la région et l'axe 2 est faible mais significatif à 5 %, alors qu'il n'y en a aucun avec l'axe 1. La région structure donc très peu le plan. C'est surtout le **type de commune** qui compte.
+
+## Question 14: Validation et interprétation du test du chi^2
+```{r q14, fig.width=7, fig.height=6}
+# Test du Chi-deux sur le tableau de contingence
+test_chi2 <- chisq.test(tab_contingence)
+
+cat("Statistique du Chi-2 :", test_chi2$statistic, "\n")
+cat("Degrés de liberté :", test_chi2$parameter, "\n")
+cat("P-valeur :", test_chi2$p.value, "\n\n")
+
+cat("Effectifs théoriques :\n")
+print(test_chi2$expected)
+
+```
+On a effectivement la Condition validée : Tous les effectifs théoriques sont >= 5
+
+Vérification des conditions d'application
+L'analyse des effectifs théoriques révèle que l'ensemble des valeurs calculées est strictement supérieur ou égal à 5. Par conséquent, la condition de validité du test du chi^2  est pleinement respectée.
+
+La statistique de test et la p-valeur obtenues sont donc totalement fiables.Il n'est pas nécessaire de procéder à une fusion de catégories ni de recourir à une autre méthode.
+
+## Question 15 : Réalisation de l'AFC et détermination du nombre d'axes
+
+```{r q15, fig.width=7, fig.height=6}
+library(FactoMineR)
+
+
+res.ca <- CA(tab_contingence, graph = FALSE)
+
+
+print(res.ca$eig)
+```
+Formule de justification :
+Dans une Analyse Factorielle des Correspondances, le nombre maximum d'axes (ou dimensions) non triviaux générés dépend directement des dimensions du tableau de contingence initial. 
+Il est donné par la formule suivante :
+
+    Nombre d'axes max = min(I - 1, J - 1)
+Avec
+    I représente le nombre de lignes =
+    J représente le nombre de colonnes=
+
+Application à notre cas (tableau 3 × 4) :
+Notre tableau croise 3 types de communes (I = 3) et 4 modes de transport (J = 4).
+
+    I - 1 = 3 - 1 = 2
+    J - 1 = 4 - 1 = 3
+
+Nombre d'axes max = min(2, 3) = 2 axes.
+
+Conclusion :
+Pour ce tableau de contingence de format 3 × 4, l'AFC produira au maximum 2 axes factoriels non triviaux. Ces deux axes suffiront à résumer 100 % de l'inertie totale (l'information) contenue dans le tableau.
+
+## Question 16 : Calcul de l'inertie totale et vérification de la relation avec le chi^2
+
+```{r q16, fig.width=7, fig.height=6}
+
+
+inertie_totale_afc <- sum(res.ca$eig[, 1])
+
+chi2_statistique <- test_chi2$statistic
+effectif_total <- sum(tab_contingence) # n = 192
+
+inertie_theorique <- chi2_statistique / effectif_total
+
+
+cat("Inertie totale issue de l'AFC (FactoMineR) :", inertie_totale_afc, "\n")
+cat("Valeur calculée (Chi-2 / n) :", inertie_theorique, "\n")
+
+
+```
+
+On remarque une égalité entre les deux variables. Preuve que l'AFC va traduire visuellement (sous forme de carte) exactement la même dépendance que celle que le test du chi^2 a détectée mathématiquement.
+
+## 17. Représentation sur le plan factoriel 
+```{r q17, fig.width=7, fig.height=6}
+fviz_ca_biplot(res.ca, axes = c(1, 2), repel = TRUE, 
+               title = "Biplot symétrique de l'Analyse Factorielle des Correspondances")
+```
+L'Axe 1 (horizontal) est exceptionnellement fort, car il résume à lui seul 90,9 % de l'information (l'inertie totale) du jeu de données. 
+
+
+```{r q18, fig.width=7, fig.height=6}
+
+
+res.ca$row$contrib[, 1]
+res.ca$row$cos2[, 1]   
+
+res.ca$col$contrib[, 1]
+res.ca$col$cos2[, 1]   
+```
+
+Du côté des communes (profils-lignes) : Le seuil de contribution moyenne théorique est de 33,3 %. La modalité "Urbaine" domine  la construction de cet axe avec une contribution massive de 70,50 %. 
+
+La commune "Rurale" participe plus modestement (22,87 %), tandis que "Periurbaine" ne contribue quasiment pas (6,63 %). 
+Leurs cosinus carrés cos^2 confirment la fiabilité de cette lecture : "Urbaine" (0,997) et "Rurale" (0,845) sont presque parfaitement projetées et lisibles sur cet axe.  
+
+Du côté des transports (profils-colonnes) : Le seuil moyen est de 25. Deux modes de transport structurent cet axe : les "Transports_commun" (51,59 %) et la "Voiture" (31,92 %). 
+Leurs cos^2 respectifs de 0,973 et 0,994 prouvent que ces deux modalités sont parfaitement représentées sur cette première dimension. 
+Les mobilités "Velo_marche" (14,62 %) et surtout "Deux_roues_motorise" (1,86 %) jouent un rôle marginal dans la définition de l'axe.
+
+# 18. Associations statistiques, analyse avec la question 5 :
+
+En lisant les proximités depuis le centre du graphique (l'origine), corroborées par les données de la question 17, l'association la plus forte et la plus structurante du jeu de données lie la commune "Urbaine" aux "Transports_commun".
+
+À l'opposé, la modalité "Rurale" attire très nettement le point "Voiture".   
+
+Confrontation avec les profils-lignes (Q5) :
+Ces associations visuelles sont la traduction mathématique directe du tableau de contingence en pourcentages. 
+
+
+Il est erroné de tirer une conclusion en mesurant l'écart direct (la distance en centimètres sur l'écran) entre le point bleu "Urbaine" et le point rouge "Transports_commun". 
+
+Mathématiquement, ces deux nuages de points n'existent pas dans le même espace dimensionnel. Le graphique de type "biplot symétrique" est une astuce mathématique superposant deux repères distincts. 
+
+Les relations entre lignes et colonnes obéissent à des règles de barycentres (équations de transition), ce qui oblige à analyser les liens non pas par la distance absolue entre les points, mais par l'angle qu'ils forment avec le centre du graphique.
+
+## 19. Test d'indépendance et pertinence d'une AFC sur region × transport_principalTest d'indépendance préalable
+
+```{r q19, fig.width=7, fig.height=6}
+tab_region_transport <- table(donneesSansNA$region, donneesSansNA$transport_principal)
+chisq.test(tab_region_transport)$expected  # effectifs théoriques
+chisq.test(tab_region_transport)
+```
+
+
+Réaliser une AFC sur le croisement region et transport_principal s'avère non pertinent pour trois raisons statistiques majeures:
+
+Test d'indépendance invalide : 
+Avec seulement 192 communes réparties sur de nombreuses régions, le tableau comportera de nombreuses cases presque vides.
+
+Absence de structure réelle : Les deux variables étant quasi-indépendantes (comme observé lors de l'ACP), l'inertie globale est extrêmement faible. 
+L'AFC forcerait la création d'axes qui ne représenteraient que du "bruit" ou des variations aléatoires.
+
+Instabilité des résultats : Le calcul de l'AFC accèlère mathématiquement les modalités rares. Les régions contenant très peu de communes deviendraient des points aberrants qui déformeraient les axes factoriels.
+
+## 20. Synthèse et conclusion 
+
+Note de synthèse :
+
+Nous avons analysé un jeu de données de plus de 190 communes, contenant différentes notions socio-économiques et géographiques.
+
+De façon exhaustive, notre jeu de données contenait des informations sur la région, le type de commune, le transport principal, la densité, le revenu médian, le taux de chômage, la part de diplômés sup, le prix du m², la part de plus de 65 ans, le temps de trajet, le nombre d'équipements.
+
+Grâce à différentes techniques et méthodes statistiques et mathématiques d'analyse de données, nous avons pu identifier différentes tendances et dépendances de certaines variables testées.
+
+
+Nous avons tout d'abord pu identifier trois grands profils de communes :
+les communes rurales,
+les communes périurbaines,
+les communes urbaines.
+
+Nous avons pu établir deux constats principaux après l'intégralité de cette analyse.
+Le premier constat que nous avons pu identifier est l'association de certains types de moyens de transport en fonction du type de commune.
+En effet, la voiture est privilégiée par plus de 75 % des habitants des communes rurales contre à peine 19 % des habitants des zones urbaines.
+
+Le deuxième constat que nous avons pu observer est l'accumulation de difficultés dans certains territoires, le taux de chômage étant inversement proportionnel aux prix du m² ou au revenu médian par exemple, ce qu'on peut observer par la grandeur des angles dans le cercle de corrélations (question 9).
+
+Ce qui implique qu'il existe des communes accumulant les difficultés, toutes principalement liées à des notions d'attractivité et d'activités économiques (le taux de chômage amenant à la baisse de toutes les autres catégories, éminemment liées à l'enclavement de ces communes).
+Nous avons également pu conclure qu'indépendamment de la situation de la région, ce constat intervient dans la plupart des cas.
+
+Revenons donc sur le premier constat, selon nos chiffres en % :
+                Deux_roues_motorise     Transports_commun     Velo_marche    Voiture
+  Periurbaine               15.49             16.90             4.23          63.38
+  Rurale                     8.82              2.94             11.76         76.47
+  Urbaine                    5.66             49.06             26.42         18.87
+  
+
+On observe une préférence de la part des habitants en zone périurbaine pour la voiture (63 %), c'est également le cas des habitants de zones rurales (76 %).
+À l'inverse, les habitants urbains privilégient les transports en commun à presque 50 %.
+
+On observe également, et c'est intéressant de le noter, que la marche est plus de trois fois plus privilégiée par les ruraux que les transports en commun, preuve d'une difficulté majeure d'accès à ceux-ci ou d'habitants ayant conscience de la difficulté de quitter leurs territoires et qui choisissent d'ajuster leur mode de vie en se déplaçant moins loin.
+
+Nos recommandations :
+Dans un premier temps, il est nécessaire de développer les transports en commun en zones périurbaines, dans lesquelles ceux-ci font déjà leurs preuves et satisfont une bonne part des habitants, et dans lesquelles il est possible de faire ses trajets du quotidien en transports.
+
+Ensuite, il peut être nécessaire d'augmenter l'offre de transports en commun en zones rurales, mais il faut avoir conscience que pour beaucoup d'habitants la voiture ou la moto sont des nécessités difficilement remplaçables pour un usage quotidien. Car une part importante d'habitants doit se déplacer depuis ces territoires enclavés pour travailler (constat 2) et qu'il est peut-être difficile pour ces habitants d'échapper à l'usage de la voiture (le temps de trajet apparaît proportionnellement inverse à la densité dans le cercle de corrélations). Il est donc également préférables de dévelloper des solutions de covoiturages, voitures à faibles consomations d'essence ou éventuellement des bornes de recharges éléctriques
+
+
+
+
+## Question Bonus: Exécution de la classification (HCPC)
+
+```{r q21, fig.width=7, fig.height=6}
+
+res.hcpc <- HCPC(res.pca, nb.clust = -1, graph = FALSE)
+
+
+fviz_cluster(res.hcpc, geom = "point", show.clust.cent = TRUE,
+             main = "Projection des 5 classes sur le plan de l'ACP")
+```
+L'algorithme, paramétré avec nb.clust = -1, a calculé automatiquement le saut d'inertie maximal sur le dendrogramme. L'optimisation du critère de Ward a identifié qu'une partition en 5 classes était la structure mathématique modélisant le mieux les données, maximisant ainsi la variance inter-classes tout en conservant une forte homogénéité intra-classe.
+
+Description géométrique et statistique des classes :
+
+    Classe 1 (Rouge - quadrant inférieur gauche) : Regroupe les communes aux coordonnées fortement négatives sur l'Axe 1 et négatives sur l'Axe 2. Elle caractérise un pôle rural profond, fortement enclavé, associé à une mobilité exclusivement automobile.
+
+    Classe 2 (Marron - quadrant supérieur gauche) : Communes également rurales (Dim 1 négative) mais moins touché par l'enclavement économique.
+
+    Classe 3 (Vert - centre inférieur) : Pôle de transition périurbaine (coordonnées proches de zéro sur la Dim 1), présentant toutefois une vulnérabilité socio-économique (Dim 2 négative).
+
+    Classe 4 (Bleu - centre supérieur) : Second pôle de transition périurbaine, mais favorisé économiquement et mieux intégré (Dim 2 positive).
+
+    Classe 5 (Violet - pôle droit) :) Elle caractérise le pôle urbain dense et riche, structurellement associé à l'usage des transports en commun et des mobilités douces.
+    
+    
