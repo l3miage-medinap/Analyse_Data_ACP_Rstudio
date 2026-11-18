@@ -17,22 +17,22 @@ L'objectif est de caractériser les profils de communes, d'identifier les struct
 
 ## 📁 Structure du projet
 
-\`\`\`text
+```text
 ├── communes.csv                          # Jeu de données (200 communes, 12 variables)
 ├── Pierre_MEDINA_Soroush_SOLEYMANI.Rmd   # Source R Markdown (code + analyse)
 ├── Pierre_MEDINA_Soroush_SOLEYMANI.html  # Rapport compilé
 ├── Pierre_MEDINA_Soroush_SOLEYMANI.pdf   # Rapport compilé
 └── README.md
-\`\`\`
+```
 
 ### Format des fichiers d'analyse
 
-Les trois fichiers \`Pierre_MEDINA_Soroush_SOLEYMANI\` (.Rmd, .html, .pdf) \*\*contiennent exactement la même chose\*\* : ce sont trois formats d'un seul et même rapport.
+Les trois fichiers `Pierre_MEDINA_Soroush_SOLEYMANI` (.Rmd, .html, .pdf) **contiennent exactement la même chose** : ce sont trois formats d'un seul et même rapport.
 
-\- Le fichier \*\*\`.Rmd\`\*\* est la \*\*source\*\* : il contient le code R et le texte de l'analyse (questions 1 à 20 + bonus). C'est le seul fichier à modifier ou à exécuter pour reproduire l'analyse.
-\- Les fichiers \*\*\`.html\`\*\* et \*\*\`.pdf\`\*\* sont des \*\*compilations\*\* de cette source, générés automatiquement lors du \`knit\` du Rmd. Ils permettent de consulter le rapport (code, résultats et graphiques) directement dans le navigateur ou dans n'importe quel lecteur PDF, sans avoir à exécuter le code.
+- Le fichier **`.Rmd`** est la **source** : il contient le code R et le texte de l'analyse (questions 1 à 20 + bonus). C'est le seul fichier à modifier ou à exécuter pour reproduire l'analyse.
+- Les fichiers **`.html`** et **`.pdf`** sont des **compilations** de cette source, générés automatiquement lors du `knit` du Rmd. Ils permettent de consulter le rapport (code, résultats et graphiques) directement dans le navigateur ou dans n'importe quel lecteur PDF, sans avoir à exécuter le code.
 
-Concrètement : si vous voulez explorer ou relancer l'analyse, ouvrez le \`.Rmd\` ; si vous voulez simplement la lire, ouvrez le \`.html\` ou le \`.pdf\`.
+Concrètement : si vous voulez explorer ou relancer l'analyse, ouvrez le `.Rmd` ; si vous voulez simplement la lire, ouvrez le `.html` ou le `.pdf`.
 
 ## 🔬 Méthodologie
 
@@ -67,5 +67,3 @@ L'axe 1 sépare nettement les communes **rurales** (côté négatif) des commune
 ### Classification (HCPC)
 
 5 classes émergent : un pôle rural profond enclavé, un pôle rural moins enclavé, deux pôles périurbains de transition (l'un vulnérable, l'autre favorisé) et un pôle urbain dense et riche orienté vers les transports en commun.
-
-
