@@ -14,7 +14,7 @@ L'objectif est de caractériser les profils de communes, d'identifier les struct
   - `factoextra` (visualisations)
   - `dplyr` (manipulation des données)
   - `corrplot` (matrice de corrélations)
-```
+
 
 ## 🔬 Méthodologie
 
