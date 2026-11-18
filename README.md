@@ -14,14 +14,6 @@ L'objectif est de caractériser les profils de communes, d'identifier les struct
   - `factoextra` (visualisations)
   - `dplyr` (manipulation des données)
   - `corrplot` (matrice de corrélations)
-
-## 📁 Structure du projet
-
-```text
-├── data/
-│   └── communes.csv          # Jeu de données (200 communes, 12 variables)
-├── analysis.R / analyse.Rmd  # Script d'analyse complet (questions 1 à 20 + bonus)
-└── README.md
 ```
 
 ## 🔬 Méthodologie
@@ -58,21 +50,4 @@ L'axe 1 sépare nettement les communes **rurales** (côté négatif) des commune
 
 5 classes émergent : un pôle rural profond enclavé, un pôle rural moins enclavé, deux pôles périurbains de transition (l'un vulnérable, l'autre favorisé) et un pôle urbain dense et riche orienté vers les transports en commun.
 
-## 💡 Recomendations issues de l'analyse
 
-- Développer les **transports en commun en zones périurbaines**, où ils font déjà leurs preuves.
-- En zones rurales, où la voiture reste une nécessité : développer le **covoiturage**, les véhicules à faible consommation et les **bornes de recharge** électriques.
-
-## 🚀 Utilisation
-
-1. Cloner le dépôt :
-   ```bash
-   git clone https://github.com/<utilisateur>/tp-analyse-donnees.git
-   ```
-2. Ouvrir le script R dans RStudio.
-3. Placer `communes.csv` dans le dossier `data/` (ou ajuster le chemin d'import).
-4. Installer les dépendances :
-   ```r
-   install.packages(c("FactoMineR", "factoextra", "dplyr", "corrplot"))
-   ```
-5. Exécuter le script pour reproduire l'ensemble des analyses et des graphiques.
